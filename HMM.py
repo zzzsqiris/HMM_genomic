@@ -1,11 +1,20 @@
 import numpy
 import math
 import HMM_utils
+import argparse
 
-states, TP, EP = HMM_utils.read_in_prob('model_params.json')
+parser = argparse.ArgumentParser()
+parser.add_argument("json_prob_file")
+parser.add_argument("fa_file")
+args = parser.parse_args()
+
+prob_file = args.json_prob_file
+unknow_seq = args.fa_file
+
+states, TP, EP = HMM_utils.read_in_prob(prob_file)
 n_s = len(states)
 
-fasta_dict = HMM_utils.read_fasta("smallgenes/ce.3.35.fa")
+fasta_dict = HMM_utils.read_fasta(unknow_seq)
 raw_seq = list(fasta_dict.values())[0].upper()
 nt_map = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
 seq = [nt_map[nt] for nt in raw_seq if nt in nt_map]
