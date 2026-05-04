@@ -1,46 +1,36 @@
 import numpy
 import math
+import HMM_utils
 
-states = ["Start", "Exon", "Intron", "End"]
+states, TP, EP = HMM_utils.read_in_prob('model_params.json')
 n_s = len(states)
 
-TP = [
-    [0.1, 0.7, 0.1, 0.1],  # Start->Start/Exon/Intron/End
-    [0.1, 0.7, 0.1, 0.1],  # Exon->Start/Exon/Intron/End
-    [0.1, 0.1, 0.7, 0.1],  # Intron->Start/Exon/Intron/End
-    [0.1, 0.1, 0.1, 0.7]   # End->Start/Exon/Intron/End
-]
+fasta_dict = HMM_utils.read_fasta("smallgenes/ce.3.35.fa")
+raw_seq = list(fasta_dict.values())[0].upper()
+nt_map = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
+seq = [nt_map[nt] for nt in raw_seq if nt in nt_map]
 
-EP = [
-    [0.25, 0.25, 0.25, 0.25], # Start: A/C/G/T
-    [0.10, 0.40, 0.40, 0.10], # Exon: A/C/G/T
-    [0.40, 0.10, 0.10, 0.40], # Intron: A/C/G/T
-    [0.25, 0.25, 0.25, 0.25]  # End: A/C/G/T
-]
 
-# init by start
-init = [0.7, 0.1, 0.1, 0.1]
-
-# 0:A, 1:C, 2:G, 3:T
-seq = [0, 2, 1, 2, 2, 3, 0, 0, 1, 2]
+init_log = [math.log(0.5), math.log(0.5)]
 
 dpm = numpy.zeros((n_s, len(seq) + 1))
 trace = numpy.full((n_s, len(seq) + 1), -1)
 
 for s in range(n_s):
-    dpm[s][0] = math.log(init[s])
+    dpm[s][0] = init_log[s]
 
 # loop through seq
 for i in range(1, len(seq)+1): 
+    obs = seq[i-1]
     # loop through states
     for cur in range(n_s):
         # init as first state
-        max_log_p = dpm[0][i-1] + math.log(TP[0][cur]) + math.log(EP[cur][seq[i-1]])
+        max_log_p = dpm[0][i-1] + TP[0][cur] + EP[cur][obs]
         best_prev_node = 0
         
         # loop through other states
         for prev in range(1, n_s):
-            current_p = dpm[prev][i-1] + math.log(TP[prev][cur]) + math.log(EP[cur][seq[i-1]])
+            current_p = dpm[prev][i-1] + TP[prev][cur] + EP[cur][obs]
             if current_p > max_log_p:
                 max_log_p = current_p
                 best_prev_node = prev
@@ -57,9 +47,7 @@ for s in range(1, n_s):
         max_val = dpm[s][len(seq)]
         current = s
 
-
-path = []
-path.append(current)
+path = [current]
 
 # trace back
 for i in range(len(seq), 0, -1):
@@ -69,7 +57,6 @@ for i in range(len(seq), 0, -1):
         current = prev_state
 
 path.reverse()
-
 path_names = []
 for p in path:
     name = states[p]
