@@ -41,7 +41,9 @@ def evaluate_performance(predicted_path, gff3_file_path):
 
     tp, tn, fp, fn = 0, 0, 0, 0
 
-    for p, t in zip(predicted_path, true_path):
+    for i in range(seq_length):
+        p = predicted_path[i]
+        t = true_path[i]
         if p == t:
             if p != 'Intron':
                 tp += 1
