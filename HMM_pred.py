@@ -67,7 +67,7 @@ for i in range(len(seq), 0, -1):
 
 path.reverse()
 path_names = []
-for p in path:
+for p in path[1:]:
     name = states[p]
     path_names.append(name)
-print(path_names)
+print('\t'.join(path_names))

@@ -55,10 +55,12 @@ def read_gff(filepath):
     with smart_open(filepath) as f:
         for line in f:
             parts = line.split('\t')
+            source = parts[1]
             ftype = parts[2]
             start = int(parts[3])
             end = int(parts[4])
-            info.append((ftype, start, end))
+            if source == "WormBase":
+                info.append((ftype, start, end))
     return info
 
 def log_probs(counts):
