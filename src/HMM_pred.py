@@ -2,6 +2,7 @@ import numpy
 import math
 import HMM_utils
 import argparse
+import os
 
 parser = argparse.ArgumentParser()
 parser.add_argument("json_prob_file")
@@ -70,4 +71,24 @@ path_names = []
 for p in path[1:]:
     name = states[p]
     path_names.append(name)
-print('\t'.join(path_names))
+
+seq_id = list(fasta_dict.keys())[0]
+
+if not os.path.exists("build"):
+    os.mkdir("build")
+
+out_file = "build/" + seq_id + ".pred.gff3"
+
+with open(out_file, "w") as f:
+    start = 1
+    current_state = path_names[0]
+
+    for i in range(1, len(path_names)):
+        if path_names[i] != current_state:
+            line = [seq_id, 'HMM_pred', current_state, str(start), str(i), '.', '.', '.', '.']
+            f.write('\t'.join(line) + '\n')
+            start = i + 1
+            current_state = path_names[i]
+
+    line = [seq_id, 'HMM_pred', current_state, str(start), str(len(path_names)), '.', '.', '.', '.']
+    f.write('\t'.join(line) + '\n')
