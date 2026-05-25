@@ -63,6 +63,71 @@ def read_gff(filepath):
                 info.append((ftype, start, end))
     return info
 
+def read_pred_gff(pred_file):
+    pred_info = []
+
+    with smart_open(pred_file) as f:
+        for line in f:
+            line = line.strip()
+            if line == "":
+                continue
+
+            parts = line.split('\t')
+            ftype = parts[2]
+            start = int(parts[3])
+            end = int(parts[4])
+            pred_info.append((ftype, start, end))
+
+    seq_length = 0
+    for ftype, start, end in pred_info:
+        if end > seq_length:
+            seq_length = end
+
+    predicted_path = ['Intron'] * seq_length
+
+    for ftype, start, end in pred_info:
+        for i in range(start - 1, end):
+            predicted_path[i] = ftype
+
+    return predicted_path
+
+def state_for_output(state):
+    splice_states = ['Donor_G', 'Donor_T', 'Acceptor_A', 'Acceptor_G']
+    if state in splice_states:
+        return 'Intron'
+    return state
+
+def read_true_path(gff_file, seq_length, is_multi_state):
+    true_path = ['Intron'] * seq_length
+    exon_label = [None] * seq_length
+    intron_pos = [False] * seq_length
+    gff_info = read_gff(gff_file)
+
+    for ftype, start, end in gff_info:
+        target_types = ['exon', 'five_prime_UTR', 'three_prime_UTR', 'CDS']
+        if ftype in target_types:
+            if is_multi_state:
+                label = ftype
+            else:
+                label = 'Exon'
+            for i in range(start - 1, end):
+                if i < seq_length:
+                    exon_label[i] = label
+        elif ftype == 'intron':
+            for i in range(start - 1, end):
+                if i < seq_length:
+                    intron_pos[i] = True
+
+    for i in range(seq_length):
+        if exon_label[i] is not None and intron_pos[i]:
+            true_path[i] = 'Skip'
+        elif exon_label[i] is not None:
+            true_path[i] = exon_label[i]
+        elif intron_pos[i]:
+            true_path[i] = 'Intron'
+
+    return true_path
+
 def log_probs(counts):
     total = sum(counts.values())
     log_probs = {}

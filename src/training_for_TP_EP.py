@@ -2,14 +2,29 @@ import HMM_utils
 import os
 import json
 import math
+import argparse
 
-data_dir = "smallgenes"
+parser = argparse.ArgumentParser()
+parser.add_argument("data_dir")
+args = parser.parse_args()
+
+data_dir = args.data_dir
 exon_counts = {'A': 0, 'C': 0, 'G': 0, 'T': 0}
 intron_counts = {'A': 0, 'C': 0, 'G': 0, 'T': 0}
 total_exon_len = 0
 num_exons = 0
 total_intron_len = 0
 num_introns = 0
+
+def add_segment(state, length):
+    global total_exon_len, num_exons, total_intron_len, num_introns
+
+    if state == "Exon":
+        total_exon_len += length
+        num_exons += 1
+    elif state == "Intron":
+        total_intron_len += length
+        num_introns += 1
 
 for filename in os.listdir(data_dir):
     # read gff3 and fasta file
@@ -20,23 +35,40 @@ for filename in os.listdir(data_dir):
         
         gene_name = filename[:-3]
         dna_seq = fasta_dict[gene_name]
-        features = HMM_utils.read_gff(gff_path)
+        true_path = HMM_utils.read_true_path(gff_path, len(dna_seq), False)
 
         # counting for EP
-        for ftype, start, end in features:
-            sub_seq = dna_seq[start-1 : end].upper()
-            if ftype == 'exon':
-                for nt in sub_seq:
-                    if nt in exon_counts:
-                        exon_counts[nt] += 1
-                total_exon_len += (end - start + 1)
-                num_exons += 1
-            elif ftype == 'intron':
-                for nt in sub_seq:
-                    if nt in intron_counts:
-                        intron_counts[nt] += 1
-                total_intron_len += (end - start + 1)
-                num_introns += 1
+        for i in range(len(dna_seq)):
+            nt = dna_seq[i].upper()
+            state = true_path[i]
+
+            if state == 'Exon':
+                if nt in exon_counts:
+                    exon_counts[nt] += 1
+            elif state == 'Intron':
+                if nt in intron_counts:
+                    intron_counts[nt] += 1
+
+        # counting average state length for TP
+        current_state = ""
+        current_len = 0
+
+        for state in true_path:
+            if state == "Skip":
+                if current_len > 0:
+                    add_segment(current_state, current_len)
+                current_state = ""
+                current_len = 0
+            elif state == current_state:
+                current_len += 1
+            else:
+                if current_len > 0:
+                    add_segment(current_state, current_len)
+                current_state = state
+                current_len = 1
+
+        if current_len > 0:
+            add_segment(current_state, current_len)
 
 ep_exon = HMM_utils.log_probs(exon_counts)
 ep_intron = HMM_utils.log_probs(intron_counts)
