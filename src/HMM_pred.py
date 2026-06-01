@@ -17,51 +17,67 @@ out_dir = args.out_dir
 states, TP, EP = HMM_utils.read_in_prob(prob_file)
 num_states = len(states)
 
+# setup
 nt_map = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
 init_log = [math.log(1 / num_states)] * num_states
+use_kmer = isinstance(EP, dict)
+
+# emission
+def get_emission_log(state_index, seq, pos):
+    if use_kmer:
+        state_name = states[state_index]
+        k, word = HMM_utils.get_kmer(seq, pos)
+        return EP[state_name][k][word]
+    else:
+        obs = nt_map[seq[pos]]
+        return EP[state_index][obs]
 
 def predict_one_file(fa_file):
+    # read fasta
     fasta_dict = HMM_utils.read_fasta(fa_file)
     raw_seq = list(fasta_dict.values())[0].upper()
-    seq = [nt_map[nt] for nt in raw_seq if nt in nt_map]
+    seq = ""
+    for nt in raw_seq:
+        if nt in nt_map:
+            seq += nt
 
-    dpm = numpy.zeros((num_states, len(seq) + 1))
+    score_table = numpy.zeros((num_states, len(seq) + 1))
     trace = numpy.full((num_states, len(seq) + 1), -1)
 
     for s in range(num_states):
-        dpm[s][0] = init_log[s]
+        score_table[s][0] = init_log[s]
 
-    # loop through seq
+    # DP table
     for i in range(1, len(seq)+1): 
-        obs = seq[i-1]
         # loop through states
-        for cur in range(num_states):
+        for cur_state in range(num_states):
             # init as first state
-            max_log_p = dpm[0][i-1] + TP[0][cur] + EP[cur][obs]
+            emit_log = get_emission_log(cur_state, seq, i - 1)
+            max_log_p = score_table[0][i-1] + TP[0][cur_state] + emit_log
             best_prev_node = 0
             
             # loop through other states
-            for prev in range(1, num_states):
-                current_p = dpm[prev][i-1] + TP[prev][cur] + EP[cur][obs]
+            for prev_state in range(1, num_states):
+                current_p = score_table[prev_state][i-1] + TP[prev_state][cur_state] + emit_log
                 if current_p > max_log_p:
                     max_log_p = current_p
-                    best_prev_node = prev
+                    best_prev_node = prev_state
             
-            dpm[cur][i] = max_log_p
-            trace[cur][i] = best_prev_node
+            score_table[cur_state][i] = max_log_p
+            trace[cur_state][i] = best_prev_node
 
-    # find last state, init as first state
-    max_val = dpm[0][len(seq)]
+    # final state
+    max_val = score_table[0][len(seq)]
     current = 0
 
     for s in range(1, num_states):
-        if dpm[s][len(seq)] > max_val:
-            max_val = dpm[s][len(seq)]
+        if score_table[s][len(seq)] > max_val:
+            max_val = score_table[s][len(seq)]
             current = s
 
     path = [current]
 
-    # trace back
+    # traceback
     for i in range(len(seq), 0, -1):
         prev_state = trace[current][i]
         if prev_state != -1:
@@ -70,6 +86,8 @@ def predict_one_file(fa_file):
 
     path.reverse()
     path_names = []
+
+    # output states
     for p in path[1:]:
         name = states[p]
         name = HMM_utils.state_for_output(name)
@@ -82,6 +100,7 @@ def predict_one_file(fa_file):
 
     out_file = os.path.join(out_dir, seq_id + ".pred.gff3")
 
+    # GFF output
     with open(out_file, "w") as f:
         start = 1
         current_state = path_names[0]

@@ -70,8 +70,8 @@ for filename in os.listdir(data_dir):
         if current_len > 0:
             add_segment(current_state, current_len)
 
-ep_exon = HMM_utils.log_probs(exon_counts)
-ep_intron = HMM_utils.log_probs(intron_counts)
+ep_exon = HMM_utils.count_to_log(exon_counts)
+ep_intron = HMM_utils.count_to_log(intron_counts)
 
 avg_exon_len = total_exon_len / num_exons
 p_ei = 1 / avg_exon_len

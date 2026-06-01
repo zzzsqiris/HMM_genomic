@@ -22,14 +22,14 @@ def rev_comp(seq):
     rev_comp_seq = comp_seq[::-1]
     return rev_comp_seq
 
-# open compressed or uncompressed file
+# open file
 def smart_open(filepath):
     if filepath.endswith('.gz'):
         return gzip.open(filepath, mode='rt')
     else:
         return open(filepath, mode='rt')
     
-# read fasta file
+# read fasta
 def read_fasta(filepath):
     fasta_dict = {}
     seq_id = ""
@@ -91,12 +91,27 @@ def read_pred_gff(pred_file):
 
     return predicted_path
 
+# output label
 def state_for_output(state):
-    splice_states = ['Donor_G', 'Donor_T', 'Acceptor_A', 'Acceptor_G']
-    if state in splice_states:
+    if state.startswith('Donor_') or state.startswith('Acceptor_'):
         return 'Intron'
     return state
 
+# kmer
+def get_kmer(seq, pos):
+    if pos == 0:
+        k = 1
+    elif pos == 1:
+        k = 2
+    elif pos == 2:
+        k = 3
+    else:
+        k = 4
+
+    start = pos - k + 1
+    return str(k), seq[start:pos + 1]
+
+# true path
 def read_true_path(gff_file, seq_length, is_multi_state):
     true_path = ['Intron'] * seq_length
     exon_label = [None] * seq_length
@@ -128,28 +143,33 @@ def read_true_path(gff_file, seq_length, is_multi_state):
 
     return true_path
 
-def log_probs(counts):
+# count to log
+def count_to_log(counts):
     total = sum(counts.values())
-    log_probs = {}
+    log_values = {}
     for nt, count in counts.items():
-        if total > 0:
+        if total > 0 and count > 0:
             prob = count / total
-            log_probs[nt] = math.log(prob)
+            log_values[nt] = math.log(prob)
         else:
-            log_probs[nt] = -100
-    return log_probs
+            log_values[nt] = -100
+    return log_values
 
+# read model
 def read_in_prob(json_path):
     with open(json_path, 'r') as f:
         data = json.load(f)
     all_states = data["states"]
     nt_order = ['A', 'C', 'G', 'T']
 
-    EP = []
-    for state in all_states:
-        state_ep = data["emission_log"][state]
-        row = [state_ep[nt] for nt in nt_order]
-        EP.append(row)
+    if data.get("emission_type") == "kmer":
+        EP = data["emission_log"]
+    else:
+        EP = []
+        for state in all_states:
+            state_ep = data["emission_log"][state]
+            row = [state_ep[nt] for nt in nt_order]
+            EP.append(row)
 
     TP = []
     for s_from in all_states:

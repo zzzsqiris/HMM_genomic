@@ -60,8 +60,8 @@ def evaluate_performance(predicted_path, gff_file):
 
     return sn, sp, acc
 
-sn_sum = 0
-sp_sum = 0
+sensitivity_sum = 0
+specificity_sum = 0
 acc_sum = 0
 num_files = 0
 missing_files = 0
@@ -83,16 +83,16 @@ for filename in os.listdir(data_dir):
         predicted_path = HMM_utils.read_pred_gff(pred_file)
         sn, sp, acc = evaluate_performance(predicted_path, gff_file)
 
-        sn_sum += sn
-        sp_sum += sp
+        sensitivity_sum += sn
+        specificity_sum += sp
         acc_sum += acc
         num_files += 1
 
 if num_files == 0:
     print("No files evaluated")
 else:
-    ave_sn = sn_sum / num_files
-    ave_sp = sp_sum / num_files
+    ave_sn = sensitivity_sum / num_files
+    ave_sp = specificity_sum / num_files
     ave_acc = acc_sum / num_files
 
     print("Number of files:", num_files)

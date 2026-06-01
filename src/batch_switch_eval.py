@@ -40,9 +40,9 @@ def count_matched(true_switches, pred_switches, tolerance):
 
     return matched
 
-sn_sum = 0
-sp_sum = 0
-ave_sum = 0
+sensitivity_sum = 0
+specificity_sum = 0
+average_sum = 0
 num_files = 0
 missing_files = 0
 
@@ -81,9 +81,9 @@ for filename in os.listdir(data_dir):
 
         switch_ave = (switch_sn + switch_sp) / 2
 
-        sn_sum += switch_sn
-        sp_sum += switch_sp
-        ave_sum += switch_ave
+        sensitivity_sum += switch_sn
+        specificity_sum += switch_sp
+        average_sum += switch_ave
         num_files += 1
 
 if num_files == 0:
@@ -93,6 +93,6 @@ else:
     print("Missing prediction files:", missing_files)
     print("Tolerance:", tolerance)
     print("Average switch evaluation")
-    print("Switch Sn:", round(sn_sum / num_files, 4))
-    print("Switch Sp:", round(sp_sum / num_files, 4))
-    print("Switch Ave:", round(ave_sum / num_files, 4))
+    print("Switch Sn:", round(sensitivity_sum / num_files, 4))
+    print("Switch Sp:", round(specificity_sum / num_files, 4))
+    print("Switch Ave:", round(average_sum / num_files, 4))

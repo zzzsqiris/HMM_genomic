@@ -18,13 +18,33 @@ states = [
     "Acceptor_1", "Acceptor_2", "Acceptor_3", "Acceptor_4", "Acceptor_5", "Acceptor_6"
 ]
 nt_order = ['A', 'C', 'G', 'T']
+max_k = 4
+
+# all kmers
+def make_kmers(k):
+    kmers = [""]
+
+    for i in range(k):
+        new_kmers = []
+        for word in kmers:
+            for nt in nt_order:
+                new_kmers.append(word + nt)
+        kmers = new_kmers
+
+    return kmers
 
 nt_counts = {}
 state_change_counts = {}
 
 # count tables
 for state in states:
-    nt_counts[state] = {'A': 1, 'C': 1, 'G': 1, 'T': 1}
+    nt_counts[state] = {}
+    for k in range(1, max_k + 1):
+        nt_counts[state][str(k)] = {}
+        all_kmers = make_kmers(k)
+        for word in all_kmers:
+            nt_counts[state][str(k)][word] = 1
+
     state_change_counts[state] = {}
     for state2 in states:
         state_change_counts[state][state2] = 0
@@ -46,25 +66,24 @@ next_states = {
     "Acceptor_6": ["Exon"]
 }
 
-# transition start counts
 for state in next_states:
     for state2 in next_states[state]:
         state_change_counts[state][state2] = 1
 
+# training files
 for filename in os.listdir(data_dir):
     if filename.endswith(".fa"):
-        # input files
         fa_path = os.path.join(data_dir, filename)
         gff_path = os.path.join(data_dir, filename[:-3] + ".gff3")
 
         if not os.path.exists(gff_path):
             continue
 
+        # true path
         fasta_dict = HMM_utils.read_fasta(fa_path)
         gene_name = filename[:-3]
         dna_seq = fasta_dict[gene_name].upper()
 
-        # true path
         true_path = HMM_utils.read_true_path(gff_path, len(dna_seq), False)
         features = HMM_utils.read_gff(gff_path)
 
@@ -82,16 +101,16 @@ for filename in os.listdir(data_dir):
                         if pos < len(true_path) and true_path[pos] == "Intron":
                             true_path[pos] = "Acceptor_" + str(j + 1)
 
-        # nt counts
+        # kmer counts
         for i in range(len(dna_seq)):
-            nt = dna_seq[i]
             state = true_path[i]
 
             if state == "Skip":
                 continue
 
-            if state in states and nt in nt_order:
-                nt_counts[state][nt] += 1
+            k, word = HMM_utils.get_kmer(dna_seq, i)
+            if state in states and word in nt_counts[state][k]:
+                nt_counts[state][k][word] += 1
 
         # transition counts
         for i in range(1, len(true_path)):
@@ -106,19 +125,29 @@ for filename in os.listdir(data_dir):
                     state_change_counts[prev_state][cur_state] += 1
 
 emission_log = {}
+
+# emission probs
 for state in states:
-    emission_log[state] = HMM_utils.count_to_log(nt_counts[state])
+    emission_log[state] = {}
+
+    for k in range(1, max_k + 1):
+        k = str(k)
+        emission_log[state][k] = HMM_utils.count_to_log(nt_counts[state][k])
 
 transition_log = {}
+
+# transition probs
 for state in states:
     transition_log[state] = HMM_utils.count_to_log(state_change_counts[state])
 
 model_params = {
-    "model_name": "splice_aware_HMM",
+    "model_name": "splice_kmer_HMM",
     "states": states,
+    "emission_type": "kmer",
+    "max_k": max_k,
     "transition_log": transition_log,
     "emission_log": emission_log
 }
 
-with open('model_params_splice.json', 'w') as f:
+with open('model_params_splice_kmer.json', 'w') as f:
     json.dump(model_params, f, indent=4)
