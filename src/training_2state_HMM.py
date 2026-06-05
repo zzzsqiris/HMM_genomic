@@ -17,7 +17,7 @@ total_intron_len = 0
 num_introns = 0
 
 def add_segment(state, length):
-    global total_exon_len, num_exons, total_intron_len, num_introns
+    global total_exon_len, num_exons, total_intron_len, num_introns #### no global
 
     if state == "Exon":
         total_exon_len += length
@@ -28,7 +28,7 @@ def add_segment(state, length):
 
 for filename in os.listdir(data_dir):
     # read gff3 and fasta file
-    if filename.endswith(".fa"):
+    if filename.endswith(".fa"):            ### if not endswith, less indent
         fa_path = os.path.join(data_dir, filename)
         fasta_dict = HMM_utils.read_fasta(fa_path)
         gff_path = os.path.join(data_dir, filename[:-3] + ".gff3")
@@ -70,8 +70,8 @@ for filename in os.listdir(data_dir):
         if current_len > 0:
             add_segment(current_state, current_len)
 
-ep_exon = HMM_utils.count_to_log(exon_counts)
-ep_intron = HMM_utils.count_to_log(intron_counts)
+ep_exon = HMM_utils.count_to_prob(exon_counts)
+ep_intron = HMM_utils.count_to_prob(intron_counts)
 
 avg_exon_len = total_exon_len / num_exons
 p_ei = 1 / avg_exon_len
@@ -84,15 +84,15 @@ p_ii = 1 - p_ie
 model_params = {
     "model_name": "E_I_two_state_HMM",
     "states": ["Exon", "Intron"],
-    "transition_log": {
-        "Exon": {"Exon": math.log(p_ee), "Intron": math.log(p_ei)},
-        "Intron": {"Exon": math.log(p_ie), "Intron": math.log(p_ii)}
+    "transition_prob": {
+        "Exon": {"Exon": p_ee, "Intron": p_ei},
+        "Intron": {"Exon": p_ie, "Intron": p_ii}
     },
-    "emission_log": {
+    "emission_prob": {
         "Exon": ep_exon,
         "Intron": ep_intron
     }
 }
 
-with open('model_params.json', 'w') as f:
+with open('model_params_2state.json', 'w') as f:
     json.dump(model_params, f, indent=4)

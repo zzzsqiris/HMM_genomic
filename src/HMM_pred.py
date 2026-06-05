@@ -26,8 +26,17 @@ use_kmer = isinstance(EP, dict)
 def get_emission_log(state_index, seq, pos):
     if use_kmer:
         state_name = states[state_index]
-        k, word = HMM_utils.get_kmer(seq, pos)
-        return EP[state_name][k][word]
+        state_ep = EP[state_name]
+        if isinstance(state_ep, list):
+            k, word = HMM_utils.get_kmer(seq, pos)
+            if word in state_ep[k]:
+                return state_ep[k][word]
+            return HMM_utils.IMPOSSIBLE_LOG
+        else:
+            nt = seq[pos]
+            if nt in state_ep:
+                return state_ep[nt]
+            return HMM_utils.IMPOSSIBLE_LOG
     else:
         obs = nt_map[seq[pos]]
         return EP[state_index][obs]
@@ -96,7 +105,7 @@ def predict_one_file(fa_file):
     seq_id = list(fasta_dict.keys())[0]
 
     if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
+        os.makedirs(out_dir)
 
     out_file = os.path.join(out_dir, seq_id + ".pred.gff3")
 

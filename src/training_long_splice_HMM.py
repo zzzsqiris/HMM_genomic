@@ -18,6 +18,19 @@ states = [
     "Acceptor_1", "Acceptor_2", "Acceptor_3", "Acceptor_4", "Acceptor_5", "Acceptor_6"
 ]
 nt_order = ['A', 'C', 'G', 'T']
+fixed_nt = {
+    "Donor_1": "G",
+    "Donor_2": "T",
+    "Donor_3": "A",
+    "Donor_4": "A",
+    "Donor_5": "G",
+    "Acceptor_1": "T",
+    "Acceptor_2": "T",
+    "Acceptor_3": "T",
+    "Acceptor_4": "C",
+    "Acceptor_5": "A",
+    "Acceptor_6": "G"
+}
 
 nt_counts = {}
 state_change_counts = {}
@@ -90,7 +103,7 @@ for filename in os.listdir(data_dir):
             if state == "Skip":
                 continue
 
-            if state in states and nt in nt_order:
+            if state in states and state not in fixed_nt and nt in nt_order:
                 nt_counts[state][nt] += 1
 
         # transition counts
@@ -105,20 +118,23 @@ for filename in os.listdir(data_dir):
                 if cur_state in next_states[prev_state]:
                     state_change_counts[prev_state][cur_state] += 1
 
-emission_log = {}
+emission_prob = {}
 for state in states:
-    emission_log[state] = HMM_utils.count_to_log(nt_counts[state])
+    if state in fixed_nt:
+        emission_prob[state] = {fixed_nt[state]: 1}
+    else:
+        emission_prob[state] = HMM_utils.count_to_prob(nt_counts[state])
 
-transition_log = {}
+transition_prob = {}
 for state in states:
-    transition_log[state] = HMM_utils.count_to_log(state_change_counts[state])
+    transition_prob[state] = HMM_utils.count_to_prob(state_change_counts[state])
 
 model_params = {
-    "model_name": "splice_aware_HMM",
+    "model_name": "long_splice_HMM",
     "states": states,
-    "transition_log": transition_log,
-    "emission_log": emission_log
+    "transition_prob": transition_prob,
+    "emission_prob": emission_prob
 }
 
-with open('model_params_splice.json', 'w') as f:
+with open('model_params_long_splice.json', 'w') as f:
     json.dump(model_params, f, indent=4)

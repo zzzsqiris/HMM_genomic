@@ -4,7 +4,7 @@ import HMM_utils
 
 parser = argparse.ArgumentParser()
 parser.add_argument("data_dir")
-parser.add_argument("--tolerance", type=int, default=5)
+parser.add_argument("--tolerance", type=int, default=0)
 parser.add_argument("--pred_dir", default="build")
 args = parser.parse_args()
 

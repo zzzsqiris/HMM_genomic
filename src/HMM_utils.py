@@ -2,6 +2,8 @@ import gzip
 import math
 import json
 
+IMPOSSIBLE_LOG = -1000000000
+
 PAIRS = {
     "A": "T", "T": "A", "C": "G", "G": "C",
     "a": "t", "t": "a", "c": "g", "g": "c",
@@ -109,7 +111,7 @@ def get_kmer(seq, pos):
         k = 4
 
     start = pos - k + 1
-    return str(k), seq[start:pos + 1]
+    return k - 1, seq[start:pos + 1]
 
 # true path
 def read_true_path(gff_file, seq_length, is_multi_state):
@@ -143,17 +145,19 @@ def read_true_path(gff_file, seq_length, is_multi_state):
 
     return true_path
 
-# count to log
-def count_to_log(counts):
+# count to prob
+def count_to_prob(counts):
     total = sum(counts.values())
-    log_values = {}
+    prob_values = {}
     for nt, count in counts.items():
         if total > 0 and count > 0:
-            prob = count / total
-            log_values[nt] = math.log(prob)
-        else:
-            log_values[nt] = -100
-    return log_values
+            prob_values[nt] = count / total
+    return prob_values
+
+def prob_to_log(prob):
+    if prob > 0:
+        return math.log(prob)
+    return IMPOSSIBLE_LOG
 
 # read model
 def read_in_prob(json_path):
@@ -161,21 +165,58 @@ def read_in_prob(json_path):
         data = json.load(f)
     all_states = data["states"]
     nt_order = ['A', 'C', 'G', 'T']
+    using_log_params = "emission_log" in data and "emission_prob" not in data
+    emission_data = data.get("emission_prob", data.get("emission_log"))
+    transition_data = data.get("transition_prob", data.get("transition_log"))
 
     if data.get("emission_type") == "kmer":
-        EP = data["emission_log"]
+        EP = {}
+        for state in all_states:
+            state_ep = emission_data[state]
+            if isinstance(state_ep, list):
+                EP[state] = []
+                for table in state_ep:
+                    log_table = {}
+                    for word, prob in table.items():
+                        if using_log_params:
+                            log_table[word] = prob
+                        else:
+                            log_table[word] = prob_to_log(prob)
+                    EP[state].append(log_table)
+            else:
+                EP[state] = {}
+                for nt, prob in state_ep.items():
+                    if using_log_params:
+                        EP[state][nt] = prob
+                    else:
+                        EP[state][nt] = prob_to_log(prob)
     else:
         EP = []
         for state in all_states:
-            state_ep = data["emission_log"][state]
-            row = [state_ep[nt] for nt in nt_order]
+            state_ep = emission_data[state]
+            row = []
+            for nt in nt_order:
+                if nt in state_ep:
+                    if using_log_params:
+                        row.append(state_ep[nt])
+                    else:
+                        row.append(prob_to_log(state_ep[nt]))
+                else:
+                    row.append(IMPOSSIBLE_LOG)
             EP.append(row)
 
     TP = []
     for s_from in all_states:
         row = []
         for s_to in all_states:
-            row.append(data["transition_log"][s_from][s_to])
+            if s_from in transition_data and s_to in transition_data[s_from]:
+                prob = transition_data[s_from][s_to]
+                if "transition_log" in data and "transition_prob" not in data:
+                    row.append(prob)
+                else:
+                    row.append(prob_to_log(prob))
+            else:
+                row.append(IMPOSSIBLE_LOG)
         TP.append(row)
         
     return all_states, TP, EP

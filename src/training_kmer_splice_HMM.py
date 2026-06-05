@@ -1,7 +1,6 @@
 import HMM_utils
 import os
 import json
-import math
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -19,6 +18,20 @@ states = [
 ]
 nt_order = ['A', 'C', 'G', 'T']
 max_k = 4
+kmer_states = ["Exon", "Intron"]
+fixed_nt = {
+    "Donor_1": "G",
+    "Donor_2": "T",
+    "Donor_3": "A",
+    "Donor_4": "A",
+    "Donor_5": "G",
+    "Acceptor_1": "T",
+    "Acceptor_2": "T",
+    "Acceptor_3": "T",
+    "Acceptor_4": "C",
+    "Acceptor_5": "A",
+    "Acceptor_6": "G"
+}
 
 # all kmers
 def make_kmers(k):
@@ -38,12 +51,13 @@ state_change_counts = {}
 
 # count tables
 for state in states:
-    nt_counts[state] = {}
-    for k in range(1, max_k + 1):
-        nt_counts[state][str(k)] = {}
-        all_kmers = make_kmers(k)
-        for word in all_kmers:
-            nt_counts[state][str(k)][word] = 1
+    if state in kmer_states:
+        nt_counts[state] = []
+        for k in range(1, max_k + 1):
+            nt_counts[state].append({})
+            all_kmers = make_kmers(k)
+            for word in all_kmers:
+                nt_counts[state][k - 1][word] = 1
 
     state_change_counts[state] = {}
     for state2 in states:
@@ -108,9 +122,10 @@ for filename in os.listdir(data_dir):
             if state == "Skip":
                 continue
 
-            k, word = HMM_utils.get_kmer(dna_seq, i)
-            if state in states and word in nt_counts[state][k]:
-                nt_counts[state][k][word] += 1
+            if state in kmer_states:
+                k, word = HMM_utils.get_kmer(dna_seq, i)
+                if word in nt_counts[state][k]:
+                    nt_counts[state][k][word] += 1
 
         # transition counts
         for i in range(1, len(true_path)):
@@ -124,30 +139,31 @@ for filename in os.listdir(data_dir):
                 if cur_state in next_states[prev_state]:
                     state_change_counts[prev_state][cur_state] += 1
 
-emission_log = {}
+emission_prob = {}
 
 # emission probs
 for state in states:
-    emission_log[state] = {}
+    if state in kmer_states:
+        emission_prob[state] = []
+        for k in range(max_k):
+            emission_prob[state].append(HMM_utils.count_to_prob(nt_counts[state][k]))
+    else:
+        emission_prob[state] = {fixed_nt[state]: 1}
 
-    for k in range(1, max_k + 1):
-        k = str(k)
-        emission_log[state][k] = HMM_utils.count_to_log(nt_counts[state][k])
-
-transition_log = {}
+transition_prob = {}
 
 # transition probs
 for state in states:
-    transition_log[state] = HMM_utils.count_to_log(state_change_counts[state])
+    transition_prob[state] = HMM_utils.count_to_prob(state_change_counts[state])
 
 model_params = {
-    "model_name": "splice_kmer_HMM",
+    "model_name": "kmer_splice_HMM",
     "states": states,
     "emission_type": "kmer",
     "max_k": max_k,
-    "transition_log": transition_log,
-    "emission_log": emission_log
+    "transition_prob": transition_prob,
+    "emission_prob": emission_prob
 }
 
-with open('model_params_splice_kmer.json', 'w') as f:
+with open('model_params_kmer_splice.json', 'w') as f:
     json.dump(model_params, f, indent=4)
